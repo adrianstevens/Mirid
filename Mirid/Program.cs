@@ -38,16 +38,32 @@ namespace Mirid
 
             drivers = drivers.OrderBy(x => x.PackageName).ToList();
 
-            WriteCSV();
+            WriteCSVs();
         }
 
-        static void WriteCSV()
+        static void WriteCSVs()
         {
-            using (var writer = new StreamWriter("MFDrivers.csv"))
+            using (var writer = new StreamWriter("AllDrivers.csv"))
             {
                 using (var csv = new CsvWriter(writer, CultureInfo.InvariantCulture))
                 {
                     csv.WriteRecords(drivers);
+                }
+            }
+
+            using (var writer = new StreamWriter("InProgressDrivers.csv"))
+            {
+                using (var csv = new CsvWriter(writer, CultureInfo.InvariantCulture))
+                {
+                    csv.WriteRecords(drivers.Where(d => d.IsTested == false));
+                }
+            }
+
+            using (var writer = new StreamWriter("TestedDrivers.csv"))
+            {
+                using (var csv = new CsvWriter(writer, CultureInfo.InvariantCulture))
+                {
+                    csv.WriteRecords(drivers.Where(d => d.IsTested == true));
                 }
             }
         }
@@ -81,7 +97,7 @@ namespace Mirid
             }
 
             //datasheet
-            var datasheetDir = parentDir.GetDirectories("Datasheet").FirstOrDefault();
+            var datasheetDir = parentDir.GetDirectories("Datasheet*").FirstOrDefault();
 
             if (datasheetDir != null)
             {
