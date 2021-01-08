@@ -73,6 +73,13 @@ namespace Mirid
 
             var parentDir = driverFile.Directory.Parent.Parent;
 
+            //number of drivers
+            var driverDir = driverFile.Directory.GetDirectories("Drivers").FirstOrDefault();
+            if(driverDir != null)
+            {
+                driver.NumberOfDrivers = driverDir.GetFiles().Count();
+            }
+
             //datasheet
             var datasheetDir = parentDir.GetDirectories("Datasheet").FirstOrDefault();
 
