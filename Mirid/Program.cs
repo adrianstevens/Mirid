@@ -11,6 +11,7 @@ namespace Mirid
     class Program
     {
         static string MeadowFoundationPath = "../../../../../Meadow.Foundation/Source/Meadow.Foundation.Peripherals";
+        static string MeadowFoundationDocsPath = "../../../../../Documentation/docfx/api-override/Meadow.Foundation";
 
         static FileInfo[] projectFiles;
         static List<FileInfo> driverProjectFiles = new List<FileInfo>();
@@ -33,12 +34,63 @@ namespace Mirid
 
             foreach(var driver in driverProjectFiles)
             {
-                drivers.Add(GetDriverFromFile(driver));
+                drivers.Add(GetDriverFromProjectFile(driver));
             }
 
             drivers = drivers.OrderBy(x => x.PackageName).ToList();
 
+            ReadNamespaces(drivers);
+
+            ReadDocsOverride(drivers);
+
             WriteCSVs();
+        }
+
+        static void ReadDocsOverride(List<MeadowDriver> drivers)
+        {
+            foreach(var d in drivers)
+            {
+                //  var override = Path.Combine()
+                var simpleName = d.PackageName.Split('.').LastOrDefault();
+
+                var fileName = d.Namespace + "." + simpleName + ".md";
+                var filePath = Path.Combine(MeadowFoundationDocsPath, fileName);
+
+                if(File.Exists(filePath))
+                {
+                    d.HasDocOverride = true;
+                }
+            }
+        }
+
+        static string GetSimpleName(FileInfo file)
+        {
+            var nameChunks = file.Name.Split('.');
+
+             return nameChunks[nameChunks.Length - 2];
+        }
+
+        static void ReadNamespaces(List<MeadowDriver> drivers)
+        {
+            foreach(var d in drivers)
+            {
+                var file = d.DriverFiles[0];
+
+                if(file == null) { continue; }
+
+                //read the file contents
+                var lines = File.ReadAllLines(file.FullName);
+
+                foreach(var line in lines)
+                {
+                    if(line.Contains("namespace"))
+                    {
+                        d.Namespace = line.Substring("namespace ".Length);
+                        Console.WriteLine("Found namespace" + line.Substring("namespace ".Length));
+                        break;
+                    }
+                }
+            }
         }
 
         static void WriteCSVs()
@@ -68,18 +120,18 @@ namespace Mirid
             }
         }
 
-        static MeadowDriver GetDriverFromFile(FileInfo driverFile)
+        static MeadowDriver GetDriverFromProjectFile(FileInfo driverProjectFile)
         {
-            if(File.Exists(driverFile.FullName) == false)
+            if(File.Exists(driverProjectFile.FullName) == false)
             {
                 return null;
             }
 
-            var project = File.ReadAllText(driverFile.FullName);
+            var project = File.ReadAllText(driverProjectFile.FullName);
 
             //metadata
             var driver = new MeadowDriver();
-            driver.PackageName = driverFile.Name.Substring(0, driverFile.Name.IndexOf(".csproj"));
+            driver.PackageName = driverProjectFile.Name.Substring(0, driverProjectFile.Name.IndexOf(".csproj"));
             driver.CsProjMetadata.AssemblyName = GetElement(project, "AssemblyName", driver.PackageName);
             driver.CsProjMetadata.CompanyName = GetElement(project, "Company", driver.PackageName);
             driver.CsProjMetadata.PackageId = GetElement(project, "PackageId", driver.PackageName);
@@ -87,13 +139,26 @@ namespace Mirid
             driver.CsProjMetadata.AssemblyName = GetElement(project, "AssemblyName", driver.PackageName);
             driver.CsProjMetadata.GeneratePackageOnBuild = GetElement(project, "GeneratePackageOnBuild", driver.PackageName);
 
-            var parentDir = driverFile.Directory.Parent.Parent;
+            var parentDir = driverProjectFile.Directory.Parent.Parent;
 
             //number of drivers
-            var driverDir = driverFile.Directory.GetDirectories("Drivers").FirstOrDefault();
+            var driverDir = driverProjectFile.Directory.GetDirectories("Drivers").FirstOrDefault();
             if(driverDir != null)
             {
-                driver.NumberOfDrivers = driverDir.GetFiles().Count();
+                driver.DriverFiles = driverDir.GetFiles();
+            }
+            else
+            {
+                var fileName = GetSimpleName(driverProjectFile) + ".cs";
+
+                var file = Path.Combine(driverProjectFile.DirectoryName, fileName);
+
+                if(File.Exists(file) == false)
+                {
+                    Console.WriteLine($"Couldn't find {file}");
+                }
+
+                driver.DriverFiles = new FileInfo[] { new FileInfo(file) };
             }
 
             //datasheet
