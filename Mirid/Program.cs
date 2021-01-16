@@ -1,10 +1,9 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Globalization;
 using System.IO;
 using System.Linq;
-using CsvHelper;
 using Mirid.Models;
+using Mirid.Output;
 
 namespace Mirid
 {
@@ -14,24 +13,24 @@ namespace Mirid
         static string MeadowFoundationDocsPath = "../../../../../Documentation/docfx/api-override/Meadow.Foundation";
 
         static FileInfo[] projectFiles;
-        static List<FileInfo> driverProjectFiles = new List<FileInfo>();
-        static List<FileInfo> sampleProjectFiles = new List<FileInfo>();
 
-        static List<MeadowDriver> drivers = new List<MeadowDriver>();
+        //static List<MeadowDriverProject> driverProjects = new List<MeadowDriverProject>();
+
+        static List<FileInfo> driverProjectFiles = new List<FileInfo>();
+        //static List<FileInfo> sampleProjectFiles = new List<FileInfo>();
+
+        static List<MFDriver> drivers = new List<MFDriver>();
 
         static void Main(string[] args)
         {
             Console.Clear();
             Console.WriteLine("Hello Mirid!");
 
-            //check if path exists first
-            if (Directory.Exists(MeadowFoundationPath))
-            {
-                projectFiles = GetCsProjFiles(MeadowFoundationPath);
-            }
+            projectFiles = FileCrawler.GetAllProjectsInFolders(MeadowFoundationPath);
 
-            SortProjects(projectFiles);
-
+            driverProjectFiles = FileCrawler.GetDriverProjects(projectFiles);
+            //sampleProjectFiles = FileCrawler.GetSampleProjects(projectFiles);
+            
             foreach(var driver in driverProjectFiles)
             {
                 drivers.Add(GetDriverFromProjectFile(driver));
@@ -43,10 +42,10 @@ namespace Mirid
 
             ReadDocsOverride(drivers);
 
-            WriteCSVs();
+            CsvOutput.WriteCSVs(drivers);
         }
 
-        static void ReadDocsOverride(List<MeadowDriver> drivers)
+        static void ReadDocsOverride(List<MFDriver> drivers)
         {
             foreach(var d in drivers)
             {
@@ -70,7 +69,7 @@ namespace Mirid
              return nameChunks[nameChunks.Length - 2];
         }
 
-        static void ReadNamespaces(List<MeadowDriver> drivers)
+        static void ReadNamespaces(List<MFDriver> drivers)
         {
             foreach(var d in drivers)
             {
@@ -93,51 +92,16 @@ namespace Mirid
             }
         }
 
-        static void WriteCSVs()
-        {
-            using (var writer = new StreamWriter("AllDrivers.csv"))
-            {
-                using (var csv = new CsvWriter(writer, CultureInfo.InvariantCulture))
-                {
-                    csv.WriteRecords(drivers);
-                }
-            }
-
-            using (var writer = new StreamWriter("InProgressDrivers.csv"))
-            {
-                using (var csv = new CsvWriter(writer, CultureInfo.InvariantCulture))
-                {
-                    csv.WriteRecords(drivers.Where(d => d.IsTested == false));
-                }
-            }
-
-            using (var writer = new StreamWriter("TestedDrivers.csv"))
-            {
-                using (var csv = new CsvWriter(writer, CultureInfo.InvariantCulture))
-                {
-                    csv.WriteRecords(drivers.Where(d => d.IsTested == true));
-                }
-            }
-        }
-
-        static MeadowDriver GetDriverFromProjectFile(FileInfo driverProjectFile)
+        static MFDriver GetDriverFromProjectFile(FileInfo driverProjectFile)
         {
             if(File.Exists(driverProjectFile.FullName) == false)
             {
                 return null;
             }
 
-            var project = File.ReadAllText(driverProjectFile.FullName);
-
             //metadata
-            var driver = new MeadowDriver();
+            var driver = new MFDriver();
             driver.PackageName = driverProjectFile.Name.Substring(0, driverProjectFile.Name.IndexOf(".csproj"));
-            driver.CsProjMetadata.AssemblyName = GetElement(project, "AssemblyName", driver.PackageName);
-            driver.CsProjMetadata.CompanyName = GetElement(project, "Company", driver.PackageName);
-            driver.CsProjMetadata.PackageId = GetElement(project, "PackageId", driver.PackageName);
-            driver.CsProjMetadata.Description = GetElement(project, "Description", driver.PackageName);
-            driver.CsProjMetadata.AssemblyName = GetElement(project, "AssemblyName", driver.PackageName);
-            driver.CsProjMetadata.GeneratePackageOnBuild = GetElement(project, "GeneratePackageOnBuild", driver.PackageName);
 
             var parentDir = driverProjectFile.Directory.Parent.Parent;
 
@@ -181,79 +145,6 @@ namespace Mirid
             }
 
             return driver;
-        }
-
-        static string GetElement(string project, string element, string name)
-        {
-            int index = project.IndexOf(element);
-
-            if(index == -1)
-            {
-            //    Console.WriteLine($"Could not find {element} for {name}");
-                return string.Empty;
-            }
-
-            int start = project.IndexOf(">", index) + 1;
-            int end = project.IndexOf("<", start);
-
-            return project.Substring(start, end - start);
-        }
-
-        static void CheckForMatchingClass(List<FileInfo> driverProjectFiles)
-        { 
-            foreach(var file in driverProjectFiles)
-            {
-                if(DoesProjectContainMatchingClass(file) == false)
-                {
-                    Console.WriteLine($"Missing matching driver class for {file}");
-                }
-            }
-        }
-
-        static bool DoesProjectContainMatchingClass(FileInfo projectFile)
-        {
-            var driverName = projectFile.Name.Substring(0, projectFile.Name.IndexOf(".csproj"));
-            driverName = driverName.Substring(driverName.LastIndexOf(".") + 1);
-
-            var directory = projectFile.Directory;
-
-            bool exists = File.Exists(Path.Combine(directory.FullName, driverName + ".cs"));
-
-            if(exists == false)
-            {
-                exists = File.Exists(Path.Combine(directory.FullName, driverName + "Base.cs"));
-            }
-            if (exists == false)
-            {
-                exists = File.Exists(Path.Combine(directory.FullName, driverName + "Core.cs"));
-            }
-            return exists;
-        }
-
-        static bool IsProjectInMatchingFolder(FileInfo projectFile)
-        {
-            return false;
-        }
-
-        static void SortProjects(FileInfo[] projectFiles)
-        { 
-            foreach(var file in projectFiles)
-            {
-                //   Console.WriteLine($"Found {file.Name}");
-                if(file.Name.Contains("Sample"))
-                {
-                    sampleProjectFiles.Add(file);  
-                }
-                else
-                {
-                    driverProjectFiles.Add(file);
-                }
-            }
-        }
-
-        static FileInfo[] GetCsProjFiles(string path)
-        {
-            return (new DirectoryInfo(path)).GetFiles("*.csproj", SearchOption.AllDirectories);
         }
     }
 }
