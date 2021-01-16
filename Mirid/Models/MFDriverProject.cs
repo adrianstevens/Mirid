@@ -13,15 +13,11 @@ namespace Mirid.Models
 
         //private
         string projectText;
-
-        public MFDriverProject(string path)
-        {
-            LoadDriverText(path);
-            ParseElements();
-        }
+        FileInfo fileInfo;
 
         public MFDriverProject(FileInfo fileInfo)
         {
+            this.fileInfo = fileInfo;
             LoadDriverText(fileInfo.FullName);
             ParseElements();
         }
@@ -40,19 +36,21 @@ namespace Mirid.Models
         void ParseElements()
         {
             AssemblyName = GetElement("AssemblyName");
-            CompanyName = GetElement("CompanyName");
+            CompanyName = GetElement("Company");
             Version = GetElement("Version");
             PackageId = GetElement("PackageId");
             Description = GetElement("Description");
+            GeneratePackageOnBuild = GetElement("GeneratePackageOnBuild");
+
+            if(string.IsNullOrWhiteSpace(PackageId))
+            {
+                //parse the project name
+                PackageId = "Meadow.Foundation." + Path.GetFileNameWithoutExtension(fileInfo.Name);
+            }
         }
 
         void LoadDriverText(string path)
         {
-            if(string.IsNullOrWhiteSpace(path))
-            {
-                return; //for now
-            }
-
             if (File.Exists(path) == false)
             {
                 throw new FileNotFoundException($"Couldn't find driver project {path}");

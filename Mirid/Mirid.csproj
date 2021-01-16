@@ -8,7 +8,7 @@
   <ItemGroup>
     <Folder Include="Models\" />
     <Folder Include="Logic\" />
-    <Folder Include="Output\" />
+    <Folder Include="Outputs\" />
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="CsvHelper" Version="19.0.0" />

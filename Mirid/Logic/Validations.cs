@@ -10,17 +10,6 @@ namespace Mirid
         {
         }
 
-        static void CheckForMatchingClass(List<FileInfo> driverProjectFiles)
-        {
-            foreach (var file in driverProjectFiles)
-            {
-                if (DoesProjectContainMatchingClass(file) == false)
-                {
-                    Console.WriteLine($"Missing matching driver class for {file}");
-                }
-            }
-        }
-
         static bool DoesProjectContainMatchingClass(FileInfo projectFile)
         {
             var driverName = projectFile.Name.Substring(0, projectFile.Name.IndexOf(".csproj"));
